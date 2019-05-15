@@ -1,0 +1,102 @@
+from statistics import mean
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib import style
+from sklearn import  preprocessing, neighbors, svm
+from sklearn.model_selection import train_test_split
+import sys
+style.use('ggplot')
+df = pd.read_csv("dataraw.csv", encoding='latin1')
+df.fillna(0, inplace=True)
+df.drop(['Date/Time'], 1, inplace=True)
+xsr = df['NE-ISO Total (LOAD_FORECAST) Average']
+ysr = df['.H.INTERNAL_HUB (DALMP) Average']
+zsr = [14690, 13550, 12740,12350,12110,12280,12950,14180,15510,16430,17050,17650,18180,18700,19110,19500,19900,20210,20500,20240,20030,20000,19280,17800]
+
+xs = np.array(xsr, dtype=np.float64)
+ys = np.array(ysr, dtype=np.float64)
+zs = np.array(zsr, dtype=np.float64)
+
+xs_mean = xs.mean()
+ys_mean = ys.mean()
+xsys = xs * ys
+xsys_mean = xsys.mean()
+xsxs = xs ** 2
+xsxs_mean = xsxs.mean()
+
+
+def best_fit_slope_and_intercept(xs, ys):
+    m = (((xs_mean * ys_mean) - xsys_mean) /
+         ((xs_mean ** 2) - xsxs_mean))
+
+    b = ys_mean - m * xs_mean
+
+    return m, b
+
+
+def squared_error(ys_orig, ys_line):
+    return sum((ys_line - ys_orig) ** 2)
+
+
+def coefficient_of_determination(ys_orig, ys_line):
+    y_mean_line = [mean(ys_orig) for y in ys_orig]
+    squared_error_regr = squared_error(ys_orig, ys_line)
+    squared_error_y_mean = squared_error(ys_orig, y_mean_line)
+    return 1 - (squared_error_regr / squared_error_y_mean)
+
+
+m, b = best_fit_slope_and_intercept(xs, ys)
+
+
+regression_line = []
+for x in xs:
+    regression_line.append((m * x) + b)
+
+r_squared = coefficient_of_determination(ys, regression_line)
+
+
+predict_x = [16833, 13982, 13336, 12821, 12633, 12955, 13905, 15476, 16602, 17631, 18292,
+             19160, 19895, 20569, 21380, 21831, 22191, 22403, 22331, 21774, 21506, 20465, 19006, 17192]
+
+predict_x = np.array(predict_x, dtype=np.float64)
+
+predict_y = (m * predict_x) + b
+
+predict_y_mean = predict_y[7:22].mean()
+
+
+plt.scatter(xs, ys, color='#003F72', label='data')
+plt.plot(xs, regression_line, label='regression line')
+plt.scatter(predict_x, predict_y, color='g')
+plt.legend(loc=4)
+plt.show()
+
+df.fillna(0)
+
+
+X = np.array(df.drop(['.H.INTERNAL_HUB (DALMP) Average'],1))
+y = np.array(df['.H.INTERNAL_HUB (DALMP) Average'])
+Z = X,y
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5)
+
+# option for SVM algorithm
+
+#clf = svm.SVR(kernel='linear') 
+#clf = svm.SVC(kernel='linear')
+clf = svm.SVC()
+
+# option for KNN classifier 
+# clf = neighbors.KNeighborsClassifier()
+
+clf.fit(X_train, y_train)
+confidence = clf.score(X_test, y_test)
+print(confidence)
+
+for k in ['linear','poly','rbf','sigmoid']:
+    clf = svm.SVR(kernel=k)
+    clf.fit(X_train, y_train)
+    confidence = clf.score(X_test, y_test)
+    print(k,confidence)
+
